@@ -1,10 +1,20 @@
 <!DOCTYPE html>
 <html lang="en" data-turbo-native="true">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <meta name="turbo-refresh-method" content="morph">
+  <meta name="turbo-refresh-scroll" content="preserve">
   <title>Page 2</title>
-  <script src="https://cdn.jsdelivr.net/npm/@hotwired/turbo@7.3.0/dist/turbo.es5-umd.js"></script>
+  <script type="importmap">
+      {
+        "imports": {
+          "@hotwired/turbo": "https://cdn.jsdelivr.net/npm/@hotwired/turbo@8.0.2/+esm",
+          "@hotwired/stimulus": "https://cdn.jsdelivr.net/npm/@hotwired/stimulus@3.2.2/+esm",
+          "@hotwired/hotwire-native-bridge": "https://cdn.jsdelivr.net/npm/@hotwired/hotwire-native-bridge@1.0.0/+esm"
+        }
+      }
+    </script>
 </head>
 <body>
   <h1>This is Page 2</h1>
