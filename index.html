@@ -6,20 +6,64 @@
   <meta name="turbo-refresh-method" content="morph">
   <meta name="turbo-refresh-scroll" content="preserve">
   <title>Turbo Native Demo</title>
+  
+  <!-- Import Map with fallback CDN -->
   <script type="importmap">
-      {
-        "imports": {
-          "@hotwired/turbo": "https://cdn.jsdelivr.net/npm/@hotwired/turbo@8.0.2/+esm",
-          "@hotwired/stimulus": "https://cdn.jsdelivr.net/npm/@hotwired/stimulus@3.2.2/+esm",
-          "@hotwired/hotwire-native-bridge": "https://cdn.jsdelivr.net/npm/@hotwired/hotwire-native-bridge@1.0.0/+esm"
-        }
+    {
+      "imports": {
+        "@hotwired/turbo": "https://cdn.jsdelivr.net/npm/@hotwired/turbo@8.0.2/+esm",
+        "@hotwired/stimulus": "https://cdn.jsdelivr.net/npm/@hotwired/stimulus@3.2.2/+esm",
+        "@hotwired/hotwire-native-bridge": "https://cdn.jsdelivr.net/npm/@hotwired/hotwire-native-bridge@1.0.0/+esm"
       }
-    </script>
-  <script type="module" src="/application.js"></script>
+    }
+  </script>
+
+  <!-- Inline script to handle initialization -->
+  <script type="module">
+    try {
+      // Import required modules
+      const { Turbo } = await import('@hotwired/turbo')
+      const { NativeBridge } = await import('@hotwired/hotwire-native-bridge')
+      
+      console.log('Turbo version:', Turbo.version)
+      console.log('NativeBridge available:', !!NativeBridge)
+
+      // Initialize the native bridge
+      NativeBridge.start()
+      
+      // Optional: Add debug event listeners
+      document.addEventListener('turbo:load', (event) => {
+        console.log('Page loaded via Turbo:', event.detail.url)
+      })
+
+      document.addEventListener('turbo:frame-load', (event) => {
+        console.log('Frame loaded:', event.target)
+      })
+
+      // Confirm initialization to native app
+      if (window.nativeBridge) {
+        window.nativeBridge.turboIsReady()
+      }
+
+    } catch (error) {
+      console.error('Initialization error:', error)
+      if (window.nativeBridge) {
+        window.nativeBridge.turboFailedToLoad(error.toString())
+      }
+    }
+  </script>
 </head>
 <body>
   <h1>Hello from Turbo Native</h1>
   <p>This is a basic working page for Hotwire Native on Android</p>
   <a href="page2.html" data-turbo="true">Go to Page 2</a>
+
+  <!-- Fallback script if module fails -->
+  <script nomodule>
+    console.error('ES modules not supported in this browser')
+    if (window.nativeBridge) {
+      window.nativeBridge.turboFailedToLoad('ES modules not supported')
+    }
+  </script>
 </body>
 </html>
