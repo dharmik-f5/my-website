@@ -3,12 +3,12 @@ import { Application } from "@hotwired/stimulus"
 import "@hotwired/hotwire-native-bridge"
 
 // Controllers
-import MenuController from "./controllers/menu_controller.js"
+import MenuController from "menu_controller_2.js"
 
 // Bridge Components
-import BridgeFormController from "./controllers/bridge/form_controller.js"
-import BridgeMenuController from "./controllers/bridge/menu_controller.js"
-import BridgeOverflowMenuController from "./controllers/bridge/overflow_menu_controller.js"
+import BridgeFormController from "form_controller.js"
+import BridgeMenuController from "menu_controller.js"
+import BridgeOverflowMenuController from "overflow_menu_controller.js"
 
 // Start Stimulus
 window.Stimulus = Application.start()
