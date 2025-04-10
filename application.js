@@ -8,9 +8,9 @@ import { TurboNativeBridge } from "@hotwired/hotwire-native-bridge"
 import MenuController from "menu_controller_2.js"
 
 // Bridge Components
-import BridgeFormController from "form_controller.js"
-import BridgeMenuController from "menu_controller.js"
-import BridgeOverflowMenuController from "overflow_menu_controller.js"
+import BridgeFormController from "/my-website/form_controller.js"
+import BridgeMenuController from "/my-website/menu_controller.js"
+import BridgeOverflowMenuController from "/my-website/overflow_menu_controller.js"
 
 
 Turbo.setAdapter(new TurboNativeBridge())
