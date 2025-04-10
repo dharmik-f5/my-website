@@ -1,6 +1,8 @@
 import "@hotwired/turbo"
 import { Application } from "@hotwired/stimulus"
 import "@hotwired/hotwire-native-bridge"
+import { Turbo } from "@hotwired/turbo"
+import { TurboNativeBridge } from "@hotwired/hotwire-native-bridge"
 
 // Controllers
 import MenuController from "menu_controller_2.js"
@@ -9,6 +11,9 @@ import MenuController from "menu_controller_2.js"
 import BridgeFormController from "form_controller.js"
 import BridgeMenuController from "menu_controller.js"
 import BridgeOverflowMenuController from "overflow_menu_controller.js"
+
+
+Turbo.setAdapter(new TurboNativeBridge())
 
 // Start Stimulus
 window.Stimulus = Application.start()
