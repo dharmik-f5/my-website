@@ -3,11 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <meta http-equiv="Permissions-Policy" content="interest-cohort=()">
   <meta name="turbo-refresh-method" content="morph">
   <meta name="turbo-refresh-scroll" content="preserve">
   <title>Turbo Native Demo</title>
-  
-  <!-- Import Map with fallback CDN and integrity checks -->
+
+  <!-- Load Turbo directly first as fallback -->
+  <script src="https://cdn.jsdelivr.net/npm/@hotwired/turbo@8.0.2/dist/turbo.es2017-esm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@hotwired/hotwire-native-bridge@1.0.0/dist/bridge.js"></script>
+
+  <!-- Import Map with fallback CDN -->
   <script type="importmap">
     {
       "imports": {
@@ -18,113 +23,128 @@
     }
   </script>
 
-  <!-- Preload critical resources -->
-  <link rel="preload" href="https://cdn.jsdelivr.net/npm/@hotwired/turbo@8.0.2/+esm" as="script" crossorigin="anonymous">
-  <link rel="preload" href="https://cdn.jsdelivr.net/npm/@hotwired/hotwire-native-bridge@1.0.0/+esm" as="script" crossorigin="anonymous">
-
-  <!-- Inline script to handle initialization with retries -->
+  <!-- Inline script with robust initialization -->
   <script type="module">
-    // Maximum retry attempts
-    const MAX_RETRIES = 3;
-    let retryCount = 0;
-    
+    // First ensure native bridge is available
+    function ensureBridgeAvailable() {
+      return new Promise((resolve) => {
+        if (window.nativeBridge) {
+          resolve();
+          return;
+        }
+
+        const maxAttempts = 10;
+        let attempts = 0;
+        
+        const checkBridge = () => {
+          attempts++;
+          if (window.nativeBridge) {
+            resolve();
+          } else if (attempts < maxAttempts) {
+            setTimeout(checkBridge, 100 * attempts);
+          } else {
+            console.error('Native bridge not available after max attempts');
+            resolve(); // Continue anyway
+          }
+        };
+        
+        checkBridge();
+      });
+    }
+
     async function initializeTurbo() {
       try {
-        // Import required modules
-        const { Turbo } = await import('@hotwired/turbo')
-        const { NativeBridge } = await import('@hotwired/hotwire-native-bridge')
+        await ensureBridgeAvailable();
         
-        console.log('Turbo version:', Turbo.version)
-        console.log('NativeBridge available:', !!NativeBridge)
+        // Load Turbo - try both ESM and classic versions
+        let Turbo, NativeBridge;
+        
+        try {
+          const turboModule = await import('@hotwired/turbo');
+          Turbo = turboModule.Turbo;
+        } catch (e) {
+          console.warn('ESM Turbo load failed, falling back to classic');
+          Turbo = window.Turbo;
+        }
+
+        try {
+          const bridgeModule = await import('@hotwired/hotwire-native-bridge');
+          NativeBridge = bridgeModule.NativeBridge;
+        } catch (e) {
+          console.warn('ESM Bridge load failed, falling back to classic');
+          NativeBridge = window.NativeBridge;
+        }
+
+        if (!Turbo) throw new Error('Turbo not loaded');
+        if (!NativeBridge) throw new Error('NativeBridge not loaded');
+
+        console.log('Turbo version:', Turbo.version);
+        console.log('NativeBridge available:', !!NativeBridge);
 
         // Initialize the native bridge
-        NativeBridge.start()
+        NativeBridge.start();
         
-        // Configure Turbo for native apps
-        Turbo.setConfirmMethod((message, element) => {
-          return new Promise((resolve) => {
-            if (window.nativeBridge && window.nativeBridge.showConfirmDialog) {
-              window.nativeBridge.showConfirmDialog(message, resolve)
-            } else {
-              resolve(window.confirm(message))
-            }
-          })
-        })
-
-        // Add debug event listeners
+        // Configure Turbo
+        Turbo.session.drive = true;
+        
+        // Event listeners
         document.addEventListener('turbo:load', (event) => {
-          console.log('Page loaded via Turbo:', event.detail.url)
+          console.log('Page loaded via Turbo:', event.detail.url);
           if (window.nativeBridge) {
-            window.nativeBridge.pageLoaded(event.detail.url)
+            window.nativeBridge.pageLoaded(event.detail.url);
           }
-        })
+        });
 
-        document.addEventListener('turbo:before-fetch-response', (event) => {
-          console.log('Fetch response received')
-        })
-
-        document.addEventListener('turbo:fetch-request-error', (error) => {
-          console.error('Fetch error:', error)
-          if (window.nativeBridge) {
-            window.nativeBridge.networkErrorOccurred(error.detail.error.toString())
-          }
-        })
-
-        // Confirm initialization to native app
+        // Confirm initialization
         if (window.nativeBridge) {
-          window.nativeBridge.turboIsReady()
+          window.nativeBridge.turboIsReady();
+        } else {
+          console.warn('Native bridge not available for ready notification');
         }
 
       } catch (error) {
-        console.error('Initialization error:', error)
-        
-        if (retryCount < MAX_RETRIES) {
-          retryCount++
-          console.log(`Retrying initialization (attempt ${retryCount})...`)
-          setTimeout(initializeTurbo, 1000 * retryCount) // Exponential backoff
-        } else {
-          console.error('Max retries reached')
-          if (window.nativeBridge) {
-            window.nativeBridge.turboFailedToLoad(error.toString())
-          }
+        console.error('Initialization error:', error);
+        if (window.nativeBridge) {
+          window.nativeBridge.turboFailedToLoad(error.toString());
         }
       }
     }
 
-    // Start initialization
-    initializeTurbo()
+    // Start initialization after brief delay to ensure bridge is injected
+    setTimeout(initializeTurbo, 50);
+  </script>
+
+  <!-- Classic script fallback -->
+  <script>
+    if (!window.nativeBridge) {
+      console.warn('Native bridge not present at page load');
+    }
+    
+    // Fallback Turbo initialization if modules fail
+    if (!window.Turbo && document.querySelector('script[type="importmap"]')) {
+      console.warn('Import maps might not be supported');
+      const turboScript = document.createElement('script');
+      turboScript.src = 'https://cdn.jsdelivr.net/npm/@hotwired/turbo@8.0.2/dist/turbo.es5-umd.js';
+      document.head.appendChild(turboScript);
+    }
   </script>
 </head>
 <body>
   <h1>Hello from Turbo Native</h1>
   <p>This is a basic working page for Hotwire Native on Android</p>
-  
-  <!-- Add loading state -->
-  <div id="loading-indicator" style="display: none;">
-    Loading content...
-  </div>
-  
   <a href="page2.html" data-turbo="true">Go to Page 2</a>
 
-  <!-- Fallback script if module fails with alternative loading -->
-  <script nomodule>
-    console.error('ES modules not supported in this browser')
-    document.getElementById('loading-indicator').style.display = 'block';
-    
-    // Load non-module versions as fallback
-    const turboScript = document.createElement('script');
-    turboScript.src = 'https://cdn.jsdelivr.net/npm/@hotwired/turbo@7.3.0/dist/turbo.es5-umd.js';
-    turboScript.onload = function() {
-      if (window.nativeBridge) {
-        window.nativeBridge.turboIsReady();
+  <div id="loading-state" style="display: none;">
+    Loading application...
+  </div>
+
+  <script>
+    // Show loading state if things take too long
+    setTimeout(() => {
+      if (!window.Turbo) {
+        document.getElementById('loading-state').style.display = 'block';
       }
-    };
-    turboScript.onerror = function() {
-      if (window.nativeBridge) {
-        window.nativeBridge.turboFailedToLoad('Could not load Turbo fallback');
-      }
-    };
-    document.head.appendChild(turboScript);
+    }, 1000);
   </script>
 </body>
 </html>
