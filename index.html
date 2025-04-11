@@ -7,7 +7,7 @@
   <meta name="turbo-refresh-scroll" content="preserve">
   <title>Turbo Native Demo</title>
   
-  <!-- Import Map with fallback CDN -->
+  <!-- Import Map with fallback CDN and integrity checks -->
   <script type="importmap">
     {
       "imports": {
@@ -18,52 +18,113 @@
     }
   </script>
 
-  <!-- Inline script to handle initialization -->
+  <!-- Preload critical resources -->
+  <link rel="preload" href="https://cdn.jsdelivr.net/npm/@hotwired/turbo@8.0.2/+esm" as="script" crossorigin="anonymous">
+  <link rel="preload" href="https://cdn.jsdelivr.net/npm/@hotwired/hotwire-native-bridge@1.0.0/+esm" as="script" crossorigin="anonymous">
+
+  <!-- Inline script to handle initialization with retries -->
   <script type="module">
-    try {
-      // Import required modules
-      const { Turbo } = await import('@hotwired/turbo')
-      const { NativeBridge } = await import('@hotwired/hotwire-native-bridge')
-      
-      console.log('Turbo version:', Turbo.version)
-      console.log('NativeBridge available:', !!NativeBridge)
+    // Maximum retry attempts
+    const MAX_RETRIES = 3;
+    let retryCount = 0;
+    
+    async function initializeTurbo() {
+      try {
+        // Import required modules
+        const { Turbo } = await import('@hotwired/turbo')
+        const { NativeBridge } = await import('@hotwired/hotwire-native-bridge')
+        
+        console.log('Turbo version:', Turbo.version)
+        console.log('NativeBridge available:', !!NativeBridge)
 
-      // Initialize the native bridge
-      NativeBridge.start()
-      
-      // Optional: Add debug event listeners
-      document.addEventListener('turbo:load', (event) => {
-        console.log('Page loaded via Turbo:', event.detail.url)
-      })
+        // Initialize the native bridge
+        NativeBridge.start()
+        
+        // Configure Turbo for native apps
+        Turbo.setConfirmMethod((message, element) => {
+          return new Promise((resolve) => {
+            if (window.nativeBridge && window.nativeBridge.showConfirmDialog) {
+              window.nativeBridge.showConfirmDialog(message, resolve)
+            } else {
+              resolve(window.confirm(message))
+            }
+          })
+        })
 
-      document.addEventListener('turbo:frame-load', (event) => {
-        console.log('Frame loaded:', event.target)
-      })
+        // Add debug event listeners
+        document.addEventListener('turbo:load', (event) => {
+          console.log('Page loaded via Turbo:', event.detail.url)
+          if (window.nativeBridge) {
+            window.nativeBridge.pageLoaded(event.detail.url)
+          }
+        })
 
-      // Confirm initialization to native app
-      if (window.nativeBridge) {
-        window.nativeBridge.turboIsReady()
-      }
+        document.addEventListener('turbo:before-fetch-response', (event) => {
+          console.log('Fetch response received')
+        })
 
-    } catch (error) {
-      console.error('Initialization error:', error)
-      if (window.nativeBridge) {
-        window.nativeBridge.turboFailedToLoad(error.toString())
+        document.addEventListener('turbo:fetch-request-error', (error) => {
+          console.error('Fetch error:', error)
+          if (window.nativeBridge) {
+            window.nativeBridge.networkErrorOccurred(error.detail.error.toString())
+          }
+        })
+
+        // Confirm initialization to native app
+        if (window.nativeBridge) {
+          window.nativeBridge.turboIsReady()
+        }
+
+      } catch (error) {
+        console.error('Initialization error:', error)
+        
+        if (retryCount < MAX_RETRIES) {
+          retryCount++
+          console.log(`Retrying initialization (attempt ${retryCount})...`)
+          setTimeout(initializeTurbo, 1000 * retryCount) // Exponential backoff
+        } else {
+          console.error('Max retries reached')
+          if (window.nativeBridge) {
+            window.nativeBridge.turboFailedToLoad(error.toString())
+          }
+        }
       }
     }
+
+    // Start initialization
+    initializeTurbo()
   </script>
 </head>
 <body>
   <h1>Hello from Turbo Native</h1>
   <p>This is a basic working page for Hotwire Native on Android</p>
+  
+  <!-- Add loading state -->
+  <div id="loading-indicator" style="display: none;">
+    Loading content...
+  </div>
+  
   <a href="page2.html" data-turbo="true">Go to Page 2</a>
 
-  <!-- Fallback script if module fails -->
+  <!-- Fallback script if module fails with alternative loading -->
   <script nomodule>
     console.error('ES modules not supported in this browser')
-    if (window.nativeBridge) {
-      window.nativeBridge.turboFailedToLoad('ES modules not supported')
-    }
+    document.getElementById('loading-indicator').style.display = 'block';
+    
+    // Load non-module versions as fallback
+    const turboScript = document.createElement('script');
+    turboScript.src = 'https://cdn.jsdelivr.net/npm/@hotwired/turbo@7.3.0/dist/turbo.es5-umd.js';
+    turboScript.onload = function() {
+      if (window.nativeBridge) {
+        window.nativeBridge.turboIsReady();
+      }
+    };
+    turboScript.onerror = function() {
+      if (window.nativeBridge) {
+        window.nativeBridge.turboFailedToLoad('Could not load Turbo fallback');
+      }
+    };
+    document.head.appendChild(turboScript);
   </script>
 </body>
 </html>
